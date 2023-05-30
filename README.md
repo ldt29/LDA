@@ -1,4 +1,5 @@
 # LDA 
+![](pics/lda.png)
 
 请使用python实现 Variational EM LDA。本次作业在 ./dataset 中提供了三种不同的数据集，dataset.txt 是英文的小规模数据集，dataset_cn.txt 是中文的中等规模数据集，dataset_cn_full.txt 是中文的大规模数据集。建议在较小数据集上验证实现正确性之后再使用较大的数据集。以下是作业要求：
 

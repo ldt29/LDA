@@ -174,7 +174,7 @@ class LDA:
         phi_d = np.ones([n_word_types, self.K]) / float(self.K)
 
         # do the optimization step
-        bound = update_params_for_one_item(self.K, n_word_types, word_indices, counts, gammas, phi_d, self.log_betas,
+        bound, phi_d, gammas = update_params_for_one_item(self.K, n_word_types, word_indices, counts, gammas, phi_d, self.log_betas,
                                            self.alpha, max_iter_d, tol_d)
 
         return bound, phi_d, gammas
@@ -196,7 +196,7 @@ class LDA:
         sum_E_ln_theta = np.sum(E_ln_thetas)  # called ss (sufficient statistics) in lda-c
 
         # repeat until convergence
-        print("alpha\tL(alpha)\tdL(alpha)")
+        # print("alpha\tL(alpha)\tdL(alpha)")
         for i in range(max_iter):
             alpha = np.exp(log_alpha)
             if np.isnan(alpha):
@@ -210,7 +210,7 @@ class LDA:
             d2L_alpha = self.compute_d2L_alpha(alpha)
             log_alpha = log_alpha - dL_alpha / (d2L_alpha * alpha + dL_alpha)
 
-            print("alpha maximization: %5.5f\t%5.5f\t%5.5f" % (np.exp(log_alpha), L_alpha, dL_alpha))
+            # print("alpha maximization: %5.5f\t%5.5f\t%5.5f" % (np.exp(log_alpha), L_alpha, dL_alpha))
             if np.abs(dL_alpha) <= newton_thresh:
                 break
 
@@ -263,6 +263,7 @@ def update_params_for_one_item(K, n_word_types, word_indices, counts, gammas, ph
     while i < max_iter_d and delta >= tol_d:
         # process all the word index: count pairs in this documents
         n = 0
+
         while n < n_word_types:
             w = word_indices[n]
             c = counts[n]
@@ -270,6 +271,9 @@ def update_params_for_one_item(K, n_word_types, word_indices, counts, gammas, ph
             ##########################################################################
             # TODO: update variational parameters inplace: gamma and phi             #
             #                                                                        #
+            new_phi_dn = np.exp(psi_gammas - psi(np.sum(gammas))) * np.exp(log_betas[w]) 
+            new_phi_dn = new_phi_dn / np.sum(new_phi_dn)
+            phi_d[n] = new_phi_dn * c
             #                                                                        #
             #                                                                        #
             ##########################################################################
@@ -277,6 +281,9 @@ def update_params_for_one_item(K, n_word_types, word_indices, counts, gammas, ph
             ## Your codes here.
 
             n += 1
+
+        gammas = alpha + np.sum(phi_d, axis=0)
+        psi_gammas = psi(gammas)
 
         # compute the part of the variational bound corresponding to this document
         bound = compute_bound_for_one_item(K, n_word_types, word_indices, counts, alpha, gammas, psi_gammas, phi_d, log_betas)
@@ -288,7 +295,7 @@ def update_params_for_one_item(K, n_word_types, word_indices, counts, gammas, ph
         prev_bound = bound
         i += 1
 
-    return bound
+    return bound, phi_d, gammas
 
 
 def compute_bound_for_one_item(K, n_word_types, word_indices, count_vector, alpha, gammas, psi_gammas, phi_d,
@@ -311,6 +318,31 @@ def compute_bound_for_one_item(K, n_word_types, word_indices, count_vector, alph
     ##########################################################################
     # TODO: calculate ELBO, return it as bound                               #
     #                                                                        #
+    psi_psi = psi_gammas - psi(np.sum(gammas))
+    term_4th = 0.0
+    for n in range(n_word_types):
+        for i in range(K):
+            term_4th += phi_d[n][i] * psi_psi[i]
+
+    term_5th = 0.0
+    for n in range(n_word_types):
+        for i in range(K):
+            term_5th += phi_d[n][i] * log_betas[word_indices[n]][i] * count_vector[i]
+
+    term_9th = 0.0
+    for n in range(n_word_types):
+        for i in range(K):
+            term_4th += phi_d[n][i] * np.log(phi_d[n][i])
+
+    bound = gammaln(K * alpha) \
+        - K * gammaln(alpha) \
+            + np.sum((alpha - 1) * psi_psi) \
+                + term_4th \
+                    + term_5th \
+                        - gammaln(np.sum(gammas)) \
+                            + np.sum(gammaln(gammas)) \
+                                - (gammas - 1) @ psi_psi \
+                                    - term_9th
     #                                                                        #
     #                                                                        #
     ##########################################################################
@@ -323,6 +355,6 @@ def compute_bound_for_one_item(K, n_word_types, word_indices, count_vector, alph
 if __name__ == "__main__":
     from utils import preprocess
 
-    docs, _, vocab = preprocess("./dataset/dataset.txt")
+    docs, _, vocab = preprocess("./dataset/dataset_cn_full.txt")
     lda = LDA(K=10, V=len(vocab))
     lda.fit(docs, vocab=vocab, display_topics=True)

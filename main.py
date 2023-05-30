@@ -66,12 +66,13 @@ class LDA:
             # store the new value of the bound
             prev_bound = self.bound
 
+            if vocab is not None and display_topics:
+                self.print_topics(vocab)
+
             # check for convergence
             if (0 < delta < tolerance) or (i + 1) >= max_epochs:
                 break
 
-            if vocab is not None and display_topics:
-                self.print_topics(vocab)
 
     def init_parameters(self, X, initital_smoothing, n_initial_docs=1):
         """
@@ -196,7 +197,7 @@ class LDA:
         sum_E_ln_theta = np.sum(E_ln_thetas)  # called ss (sufficient statistics) in lda-c
 
         # repeat until convergence
-        # print("alpha\tL(alpha)\tdL(alpha)")
+        print("alpha\tL(alpha)\tdL(alpha)")
         for i in range(max_iter):
             alpha = np.exp(log_alpha)
             if np.isnan(alpha):
@@ -210,7 +211,7 @@ class LDA:
             d2L_alpha = self.compute_d2L_alpha(alpha)
             log_alpha = log_alpha - dL_alpha / (d2L_alpha * alpha + dL_alpha)
 
-            # print("alpha maximization: %5.5f\t%5.5f\t%5.5f" % (np.exp(log_alpha), L_alpha, dL_alpha))
+            print("alpha maximization: %5.5f\t%5.5f\t%5.5f" % (np.exp(log_alpha), L_alpha, dL_alpha))
             if np.abs(dL_alpha) <= newton_thresh:
                 break
 
@@ -327,12 +328,12 @@ def compute_bound_for_one_item(K, n_word_types, word_indices, count_vector, alph
     term_5th = 0.0
     for n in range(n_word_types):
         for i in range(K):
-            term_5th += phi_d[n][i] * log_betas[word_indices[n]][i] * count_vector[i]
+            term_5th += phi_d[n][i] * log_betas[word_indices[n]][i] * count_vector[n]
 
     term_9th = 0.0
     for n in range(n_word_types):
         for i in range(K):
-            term_4th += phi_d[n][i] * np.log(phi_d[n][i])
+            term_9th += phi_d[n][i] * np.log(phi_d[n][i])
 
     bound = gammaln(K * alpha) \
         - K * gammaln(alpha) \
@@ -355,6 +356,6 @@ def compute_bound_for_one_item(K, n_word_types, word_indices, count_vector, alph
 if __name__ == "__main__":
     from utils import preprocess
 
-    docs, _, vocab = preprocess("./dataset/dataset_cn_full.txt")
+    docs, _, vocab = preprocess("./dataset/dataset.txt")
     lda = LDA(K=10, V=len(vocab))
     lda.fit(docs, vocab=vocab, display_topics=True)
